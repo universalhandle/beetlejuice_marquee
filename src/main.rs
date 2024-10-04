@@ -1,14 +1,14 @@
-// adapted from https://github.com/smart-leds-rs/smart-leds-samples/blob/master/avr-examples/examples/avr_ws2812_blink_spi_pre.rs,
-// targeting the Arduino Uno (via the generic HAL) rather than the Arduino Leonardo
-
 #![no_std]
 #![no_main]
 
-use panic_halt as _;
-
 use arduino_hal::spi;
-use smart_leds::{SmartLedsWrite, RGB8};
+use core::cmp::Ordering;
+use panic_halt as _;
+use smart_leds::{gamma, SmartLedsWrite, RGB8};
 use ws2812_spi::Ws2812;
+
+const LED_CNT: usize = 15;
+const TAIL_CNT: usize = 7;
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -23,30 +23,59 @@ fn main() -> ! {
         pins.d10.into_output(),
         spi::Settings::default(),
     );
-
-    let mut data: [RGB8; 3] = [RGB8::default(); 3];
-    let empty: [RGB8; 3] = [RGB8::default(); 3];
     let mut ws = Ws2812::new(spi);
 
+    let mut strip = [RGB8::default(); LED_CNT];
+
+    // We are making a running pattern through the strip, whereby one LED (the head)
+    // shines bright, dragging a tail of diminishing brightness behind it
+    let mut head_index: usize = 0;
+
     loop {
-        data[0] = RGB8 {
-            r: 0,
-            g: 0,
-            b: 0x10,
-        };
-        data[1] = RGB8 {
-            r: 0,
-            g: 0x10,
-            b: 0,
-        };
-        data[2] = RGB8 {
-            r: 0x10,
-            g: 0,
-            b: 0,
-        };
-        ws.write(data.iter().cloned()).unwrap();
-        arduino_hal::delay_ms(1000 as u16);
-        ws.write(empty.iter().cloned()).unwrap();
-        arduino_hal::delay_ms(1000 as u16);
+        for (index, led) in strip.iter_mut().enumerate() {
+            *led = match index.cmp(&head_index) {
+                Ordering::Greater => RGB8::default(), // off
+                Ordering::Equal => RGB8 {
+                    r: 255,
+                    g: 207,
+                    b: 57,
+                },
+                Ordering::Less => {
+                    let segments_behind_head = head_index - index;
+
+                    if segments_behind_head > TAIL_CNT {
+                        RGB8::default()
+                    } else {
+                        dim(led, segments_behind_head, TAIL_CNT);
+                        *led
+                    }
+                }
+            };
+        }
+
+        // increment the leader for the next cycle
+        if head_index < LED_CNT - 1 {
+            head_index += 1;
+        } else {
+            head_index = 0;
+        }
+
+        ws.write(gamma(strip.iter().cloned())).unwrap();
+        arduino_hal::delay_ms(100 as u16);
     }
+}
+
+fn dim(color: &mut RGB8, current_tail_pixel: usize, cnt_tail_pixels: usize) {
+    // add one because only the head should be at 100% brightness
+    let total_pixels = u8::try_from(cnt_tail_pixels + 1)
+        .and_then(|n| Ok(n))
+        .unwrap();
+    let brightness_factor = total_pixels
+        - u8::try_from(current_tail_pixel)
+            .and_then(|n| Ok(n))
+            .unwrap();
+
+    color.r = color.r / total_pixels * brightness_factor;
+    color.g = color.g / total_pixels * brightness_factor;
+    color.b = color.b / total_pixels * brightness_factor;
 }
