@@ -13,7 +13,7 @@ use ws2812_spi::Ws2812;
 const LED_CNT: usize = 15;
 // does not include the head of the running lights
 const TAIL_CNT: usize = 7;
-const CYCLE_MS: u16 = 100;
+const TICKS_PER_SEC: u16 = 100;
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -40,13 +40,21 @@ fn main() -> ! {
     // define the strip with the LEDs initialized in the "off" setting
     let mut strip = [RGB8::default(); LED_CNT];
 
+    let mut tick_cnt = 1;
     loop {
-
         // let's select all LEDs except the first four to use for the running effect
         let running_leds = &mut strip[4..];
-        effect.mutate(running_leds);
+        if tick_cnt % 10 == 0 {
+            effect.mutate(running_leds);
+        }
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
-        arduino_hal::delay_ms(CYCLE_MS);
+        arduino_hal::delay_ms(1_000 / TICKS_PER_SEC);
+
+        if tick_cnt < TICKS_PER_SEC {
+            tick_cnt += 1;
+        } else {
+            tick_cnt = 1;
+        }
     }
 }
