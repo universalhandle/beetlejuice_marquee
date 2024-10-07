@@ -11,6 +11,9 @@ use ws2812_spi::Ws2812;
 
 // global configurations
 const LED_CNT: usize = 15;
+// does not include the head of the running lights
+const TAIL_CNT: usize = 7;
+const CYCLE_MS: u16 = 100;
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -32,7 +35,7 @@ fn main() -> ! {
         g: 207,
         b: 57,
     };
-    let mut effect = RunningLights::new(&running_color, 7);
+    let mut effect = RunningLights::new(&running_color, TAIL_CNT);
 
     loop {
         // define the strip with the LEDs initialized in the "off" setting
@@ -43,6 +46,6 @@ fn main() -> ! {
         effect.mutate(running_leds);
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
-        arduino_hal::delay_ms(100 as u16);
+        arduino_hal::delay_ms(CYCLE_MS);
     }
 }
