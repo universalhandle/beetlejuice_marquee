@@ -4,15 +4,17 @@ use smart_leds::RGB8;
 // shines bright, dragging a tail of diminishing brightness behind it
 pub struct RunningLights {
     color: RGB8,
+    run_in_reverse: bool,
     head_index: usize,
     tail_length: usize,
 }
 
 impl<'a> RunningLights {
-    pub fn new(color: &RGB8, tail_length: usize) -> Self {
+    pub fn new(color: &RGB8, run_in_reverse: bool, tail_length: usize) -> Self {
         Self {
             color: *color,
             head_index: 0,
+            run_in_reverse,
             tail_length,
         }
     }
@@ -36,6 +38,10 @@ impl<'a> RunningLights {
             };
 
             leds[overall_index] = self.dim(index_in_effect, self.tail_length);
+        }
+
+        if self.run_in_reverse {
+            leds.reverse();
         }
 
         // move the head one pixel up the strip

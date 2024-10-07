@@ -37,7 +37,8 @@ fn main() -> ! {
         g: 207,
         b: 57,
     };
-    let mut effect = RunningLights::new(&running_color, TAIL_CNT);
+    let run_in_reverse = false;
+    let mut effect = RunningLights::new(&running_color, run_in_reverse, TAIL_CNT);
 
     // define the strip with the LEDs initialized in the "off" setting
     let mut strip = [RGB8::default(); LED_CNT];
