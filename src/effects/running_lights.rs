@@ -1,4 +1,3 @@
-use core::cmp::Ordering;
 use smart_leds::RGB8;
 
 // We are making a running pattern through the strip, whereby one LED (the head)
@@ -19,20 +18,19 @@ impl<'a> RunningLights {
     }
 
     pub fn mutate(&mut self, leds: &mut [RGB8]) {
-        for (index, led) in leds.iter_mut().enumerate() {
-            *led = match index.cmp(&self.head_index) {
-                Ordering::Greater => RGB8::default(), // off
-                Ordering::Equal => self.color,
-                Ordering::Less => {
-                    let segments_behind_head = self.head_index - index;
+        if leds.len() <= self.tail_length {
+            panic!("Number of LEDs too short to support configured tail length.");
+        }
 
-                    if segments_behind_head > self.tail_length {
-                        RGB8::default()
-                    } else {
-                        self.dim(segments_behind_head, self.tail_length)
-                    }
-                }
+        leds[self.head_index] = self.color;
+
+        for index_in_effect in 1..=self.tail_length {
+            let overall_index = match leds.get(self.head_index - index_in_effect) {
+                Some(_) => self.head_index - index_in_effect,
+                None => leds.len() + self.head_index - index_in_effect,
             };
+
+            leds[overall_index] = self.dim(index_in_effect, self.tail_length);
         }
 
         // move the head one pixel up the strip
