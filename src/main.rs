@@ -2,11 +2,13 @@
 #![no_main]
 
 mod effects;
+mod tick;
 
 use arduino_hal::spi;
 use effects::running_lights::RunningLights;
 use panic_halt as _;
 use smart_leds::{gamma, SmartLedsWrite, RGB8};
+use tick::Tick;
 use ws2812_spi::Ws2812;
 
 // global configurations
@@ -40,21 +42,17 @@ fn main() -> ! {
     // define the strip with the LEDs initialized in the "off" setting
     let mut strip = [RGB8::default(); LED_CNT];
 
-    let mut tick_cnt = 1;
+    let mut tick = Tick::new(TICKS_PER_SEC);
     loop {
         // let's select all LEDs except the first four to use for the running effect
         let running_leds = &mut strip[4..];
-        if tick_cnt % 10 == 0 {
+        if tick.elapsed() % 10 == 0 {
             effect.mutate(running_leds);
         }
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
         arduino_hal::delay_ms(1_000 / TICKS_PER_SEC);
 
-        if tick_cnt < TICKS_PER_SEC {
-            tick_cnt += 1;
-        } else {
-            tick_cnt = 1;
-        }
+        tick.tock();
     }
 }
