@@ -22,6 +22,11 @@ impl<'a> RunningLights {
             panic!("Number of LEDs too short to support configured tail length.");
         }
 
+        // default everything off; RGB values will be assigned based on position relative to the head
+        for led in leds.iter_mut() {
+            *led = RGB8::default();
+        }
+
         leds[self.head_index] = self.color;
 
         for index_in_effect in 1..=self.tail_length {
