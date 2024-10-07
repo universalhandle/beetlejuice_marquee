@@ -37,9 +37,10 @@ fn main() -> ! {
     };
     let mut effect = RunningLights::new(&running_color, TAIL_CNT);
 
+    // define the strip with the LEDs initialized in the "off" setting
+    let mut strip = [RGB8::default(); LED_CNT];
+
     loop {
-        // define the strip with the LEDs initialized in the "off" setting
-        let mut strip = [RGB8::default(); LED_CNT];
 
         // let's select all LEDs except the first four to use for the running effect
         let running_leds = &mut strip[4..];
