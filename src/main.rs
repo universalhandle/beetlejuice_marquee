@@ -5,7 +5,7 @@ mod effects;
 mod tick;
 
 use arduino_hal::spi;
-use effects::running_lights::RunningLights;
+use effects::arrow::Arrow;
 use panic_halt as _;
 use smart_leds::{gamma, SmartLedsWrite, RGB8};
 use tick::Tick;
@@ -37,25 +37,15 @@ fn main() -> ! {
         g: 207,
         b: 57,
     };
-    let run_in_reverse = true;
-    let mut effect_run_up = RunningLights::new(&running_color, !run_in_reverse, TAIL_CNT);
-    let mut effect_run_down = RunningLights::new(&running_color, run_in_reverse, TAIL_CNT + 1);
+    let mut arrow = Arrow::new(&running_color, TAIL_CNT);
 
     // define the strip with the LEDs initialized in the "off" setting
     let mut strip = [RGB8::default(); LED_CNT];
 
     let mut tick = Tick::new(TICKS_PER_SEC);
     loop {
-        let (leds_arrow_left, leds_unalloc) = strip.split_at_mut(10);
-        let (led_arrow_point, leds_arrow_right) = leds_unalloc.split_at_mut(1);
-
         if tick.elapsed() % 10 == 0 {
-            effect_run_up.mutate(leds_arrow_left);
-            effect_run_down.mutate(leds_arrow_right);
-            led_arrow_point[0] = effect_run_up.color_at_terminus();
-            led_arrow_point[0].r = (led_arrow_point[0].r / 9).saturating_mul(10);
-            led_arrow_point[0].g = (led_arrow_point[0].g / 9).saturating_mul(10);
-            led_arrow_point[0].b = (led_arrow_point[0].b / 9).saturating_mul(10);
+            arrow.mutate(&mut strip);
         }
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
