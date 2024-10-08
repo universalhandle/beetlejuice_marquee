@@ -49,7 +49,7 @@ fn main() -> ! {
         }
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
-        arduino_hal::delay_ms(1_000 / TICKS_PER_SEC);
+        arduino_hal::delay_ms(tick.len());
 
         tick.tock();
     }
