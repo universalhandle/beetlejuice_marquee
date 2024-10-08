@@ -5,6 +5,7 @@ use smart_leds::RGB8;
 pub struct RunningLights {
     color: RGB8,
     run_in_reverse: bool,
+    color_at_terminus: RGB8,
     head_index: usize,
     tail_length: usize,
 }
@@ -13,10 +14,15 @@ impl<'a> RunningLights {
     pub fn new(color: &RGB8, run_in_reverse: bool, tail_length: usize) -> Self {
         Self {
             color: *color,
+            color_at_terminus: RGB8::default(),
             head_index: 0,
             run_in_reverse,
             tail_length,
         }
+    }
+
+    pub fn color_at_terminus(&self) -> RGB8 {
+        self.color_at_terminus
     }
 
     pub fn mutate(&mut self, leds: &mut [RGB8]) {
@@ -39,6 +45,8 @@ impl<'a> RunningLights {
 
             leds[overall_index] = self.dim(index_in_effect, self.tail_length);
         }
+
+        self.color_at_terminus = leds[leds.len() - 1];
 
         if self.run_in_reverse {
             leds.reverse();
