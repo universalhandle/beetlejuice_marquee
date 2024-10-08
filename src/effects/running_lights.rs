@@ -10,7 +10,7 @@ pub struct RunningLights {
     tail_length: usize,
 }
 
-impl<'a> RunningLights {
+impl RunningLights {
     pub fn new(color: &RGB8, run_in_reverse: bool, tail_length: usize) -> Self {
         Self {
             color: *color,
