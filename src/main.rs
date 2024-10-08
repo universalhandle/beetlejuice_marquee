@@ -5,8 +5,9 @@ mod effects;
 mod tick;
 
 use arduino_hal::spi;
-use effects::arrow::Arrow;
+use effects::{arrow::Arrow, color_set::ColorSet};
 use panic_halt as _;
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use smart_leds::{gamma, SmartLedsWrite, RGB8};
 use tick::Tick;
 use ws2812_spi::Ws2812;
@@ -42,15 +43,43 @@ fn main() -> ! {
     );
     let mut ws = Ws2812::new(spi);
 
-    let mut arrow = Arrow::new(&YELLOW, TAIL_CNT);
+    let mut rng = SmallRng::seed_from_u64(361279846193);
 
     // define the strip with the LEDs initialized in the "off" setting
     let mut strip = [RGB8::default(); LED_CNT];
 
+    // let mut arrow = Arrow::new(&YELLOW, TAIL_CNT);
+
+    // randomly assign colors from our palette to the LEDs; this (and the clone)
+    // happens outside the loop because we don't want the LEDs changing colors
+    // once they've been assigned (and because we want to reassign the same color
+    // to an LED after turning it off)
+    let mut color_set = ColorSet::new(&[RED, YELLOW], &mut rng);
+    color_set.mutate(&mut strip);
+    let strip_init = strip.clone();
+
     let mut tick = Tick::new(TICKS_PER_SEC);
     loop {
-        if tick.elapsed() % 10 == 0 {
-            arrow.mutate(&mut strip);
+        if tick.elapsed() < 10 || (19 < tick.elapsed() && tick.elapsed() <= 30) {
+            strip = strip_init;
+        } else if 50 <= tick.elapsed() && tick.elapsed() < 90 {
+            // the second half of a second, leave the lights on
+            strip = strip_init;
+
+            // ...with a 90% chance of glitching
+            for (i, led) in strip.iter_mut().enumerate() {
+                let random = rng.gen_range(1..=10);
+                if i % 2 == 0 && random > 9 {
+                    *led = RGB8::default();
+                }
+            }
+        } else {
+            // turn off every other light
+            for (i, led) in strip.iter_mut().enumerate() {
+                if i % 2 == 0 {
+                    *led = RGB8::default();
+                }
+            }
         }
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
