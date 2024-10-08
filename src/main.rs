@@ -16,6 +16,16 @@ const LED_CNT: usize = 21;
 // does not include the head of the running lights
 const TAIL_CNT: usize = 5;
 const TICKS_PER_SEC: u16 = 100;
+const YELLOW: RGB8 = RGB8 {
+    r: 255,
+    g: 207,
+    b: 57,
+};
+const RED: RGB8 = RGB8 {
+    r: 253,
+    g: 74,
+    b: 65,
+};
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -32,12 +42,7 @@ fn main() -> ! {
     );
     let mut ws = Ws2812::new(spi);
 
-    let running_color = RGB8 {
-        r: 255,
-        g: 207,
-        b: 57,
-    };
-    let mut arrow = Arrow::new(&running_color, TAIL_CNT);
+    let mut arrow = Arrow::new(&YELLOW, TAIL_CNT);
 
     // define the strip with the LEDs initialized in the "off" setting
     let mut strip = [RGB8::default(); LED_CNT];
