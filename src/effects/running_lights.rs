@@ -63,9 +63,9 @@ impl<'a> RunningLights {
                 .unwrap();
 
         RGB8 {
-            r: self.color.r / total_pixels * brightness_factor,
-            g: self.color.g / total_pixels * brightness_factor,
-            b: self.color.b / total_pixels * brightness_factor,
+            r: (self.color.r / total_pixels).saturating_mul(brightness_factor),
+            g: (self.color.g / total_pixels).saturating_mul(brightness_factor),
+            b: (self.color.b / total_pixels).saturating_mul(brightness_factor),
         }
     }
 }
