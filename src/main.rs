@@ -54,27 +54,24 @@ fn main() -> ! {
 
     let mut arrow = Arrow::new(&YELLOW, TAIL_CNT);
 
-    // randomly assign colors from our palette to the LEDs; this (and the clone)
-    // happens outside the loop because we don't want the LEDs changing colors
-    // once they've been assigned (and because we want to reassign the same color
-    // to an LED after turning it off)
-    let mut color_set = ColorSet::new(&[RED, YELLOW], &mut rng);
-    color_set.mutate(&mut strip[GLITCH_LED_RANGE]);
-    let mut glitch_init = [RGB8 { r: 0, g: 0, b: 255 }; GLITCH_LED_CNT];
-    glitch_init.clone_from_slice(&strip[GLITCH_LED_RANGE]);
-    // hack to freeze the array
-    let glitch_init = glitch_init;
+    let mut color_set = ColorSet::new(&[RED, YELLOW]);
 
     let mut tick = Tick::new(TICKS_PER_SEC);
     loop {
+        // Assign colors from our palette to the LEDs in a seemingly random but idempotent way.
+        // This has to happen inside the loop (and hence can't be actually randomly assigned)
+        // because the Arduino doesn't have the memory capacity for the originally assigned
+        // plus the currently assigned (e.g., turned off) color for every LED. The non-randomness
+        // assures that, even though some LEDs will be turned off in some cycles, each LED will
+        // have its original color assigned the next time through, as opposed to being lit red
+        // one cycle, dark the next, and yellow after that.
+        color_set.mutate(&mut strip[GLITCH_LED_RANGE]);
+
         // glitchy flash effect
         if tick.elapsed() < 10 || (19 < tick.elapsed() && tick.elapsed() <= 30) {
-            strip[GLITCH_LED_RANGE].clone_from_slice(&glitch_init);
+            // leave the lights on
         } else if 50 <= tick.elapsed() && tick.elapsed() < 90 {
-            // the second half of a second, leave the lights on
-            strip[GLITCH_LED_RANGE].clone_from_slice(&glitch_init);
-
-            // ...with a 90% chance of glitching
+            // the second half of a second, leave the lights on... with a 90% chance of glitching
             for (i, led) in strip[GLITCH_LED_RANGE].iter_mut().enumerate() {
                 let random = rng.gen_range(1..=10);
                 if i % 2 == 0 && random > 9 {
