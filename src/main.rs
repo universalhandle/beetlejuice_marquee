@@ -88,29 +88,25 @@ fn main() -> ! {
             // leave the lights on
         } else if 75 <= glitch_frames_displayed && glitch_frames_displayed < 125 {
             // the second half of a second, leave the lights on... with a 90% chance of glitching
-            for (i, led) in strip[GLITCH_LED_RANGE_1].iter_mut().enumerate() {
+            for led in strip[GLITCH_LED_RANGE_1].iter_mut().step_by(2) {
                 let random = rng.gen_range(1..=10);
-                if i % 2 == 0 && random > 9 {
+                if random > 9 {
                     *led = RGB8::default();
                 }
             }
-            for (i, led) in strip[GLITCH_LED_RANGE_2].iter_mut().enumerate() {
+            for led in strip[GLITCH_LED_RANGE_2].iter_mut().step_by(2) {
                 let random = rng.gen_range(1..=10);
-                if i % 2 == 0 && random > 9 {
+                if random > 9 {
                     *led = RGB8::default();
                 }
             }
         } else {
             // turn off every other light
-            for (i, led) in strip[GLITCH_LED_RANGE_1].iter_mut().enumerate() {
-                if i % 2 == 0 {
-                    *led = RGB8::default();
-                }
+            for led in strip[GLITCH_LED_RANGE_1].iter_mut().step_by(2) {
+                *led = RGB8::default();
             }
-            for (i, led) in strip[GLITCH_LED_RANGE_2].iter_mut().enumerate() {
-                if i % 2 == 0 {
-                    *led = RGB8::default();
-                }
+            for led in strip[GLITCH_LED_RANGE_2].iter_mut().step_by(2) {
+                *led = RGB8::default();
             }
         }
 
