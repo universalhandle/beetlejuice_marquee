@@ -87,17 +87,21 @@ fn main() -> ! {
         {
             // leave the lights on
         } else if 75 <= glitch_frames_displayed && glitch_frames_displayed < 125 {
-            // the second half of a second, leave the lights on... with a 90% chance of glitching
+            // get glitchy
             for led in strip[GLITCH_LED_RANGE_1].iter_mut().step_by(2) {
                 let random = rng.gen_range(1..=10);
                 if random > 9 {
                     *led = RGB8::default();
+                } else if random > 4 {
+                    *led = dim(led, 2);
                 }
             }
             for led in strip[GLITCH_LED_RANGE_2].iter_mut().step_by(2) {
                 let random = rng.gen_range(1..=10);
                 if random > 9 {
                     *led = RGB8::default();
+                } else if random > 4 {
+                    *led = dim(led, 2);
                 }
             }
         } else {
@@ -116,5 +120,15 @@ fn main() -> ! {
         ws.write(gamma(strip.iter().cloned())).unwrap();
 
         animation.next();
+    }
+}
+
+fn dim(led: &RGB8, factor: usize) -> RGB8 {
+    let factor = u8::try_from(factor).and_then(|n| Ok(n)).unwrap();
+
+    RGB8 {
+        r: (led.r / factor),
+        g: (led.g / factor),
+        b: (led.b / factor),
     }
 }
