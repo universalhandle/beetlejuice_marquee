@@ -22,8 +22,8 @@ const LED_CNT: usize = 300;
 const TAIL_CNT: usize = 15; // does not include the head of the running lights
 const YELLOW: RGB8 = RGB8 {
     r: 255,
-    g: 207,
-    b: 57,
+    g: 180,
+    b: 47,
 };
 const RED: RGB8 = RGB8 {
     r: 253,
