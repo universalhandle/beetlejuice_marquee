@@ -8,18 +8,22 @@ use animation::Animation;
 use arduino_hal::spi;
 use core::cmp::Ordering;
 use core::ops::{RangeFrom, RangeInclusive, RangeTo};
-use effects::{arrow::Arrow, color_set::ColorSet};
+use effects::{arrow::Arrow, color_set::ColorSet, running_lights::RunningLights};
 use panic_halt as _;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use smart_leds::{gamma, SmartLedsWrite, RGB8};
 use ws2812_spi::Ws2812;
 
 // global configurations
-const ARROW_START: usize = 100;
-const ARROW_END: usize = 200;
+const ARROW_START: usize = 44;
+const ARROW_END: usize = 91;
+const LEFT_LEG_START: usize = 199;
+const LEFT_LEG_END: usize = 212;
+const RIGHT_LEG_START: usize = 176;
+const RIGHT_LEG_END: usize = 189;
 const GLITCH_FRAME_CNT: usize = 150;
 const LED_CNT: usize = 300;
-const TAIL_CNT: usize = 15; // does not include the head of the running lights
+const TAIL_CNT: usize = 10; // does not include the head of the running lights
 const YELLOW: RGB8 = RGB8 {
     r: 255,
     g: 180,
@@ -35,6 +39,8 @@ const RED: RGB8 = RGB8 {
 const ARROW_LED_RANGE: RangeInclusive<usize> = ARROW_START..=ARROW_END;
 const GLITCH_LED_RANGE_1: RangeTo<usize> = ..ARROW_START;
 const GLITCH_LED_RANGE_2: RangeFrom<usize> = (ARROW_END + 1)..;
+const LEFT_LEG_LED_RANGE: RangeInclusive<usize> = LEFT_LEG_START..=LEFT_LEG_END;
+const RIGHT_LEG_LED_RANGE: RangeInclusive<usize> = RIGHT_LEG_START..=RIGHT_LEG_END;
 // end config
 
 #[arduino_hal::entry]
@@ -60,6 +66,9 @@ fn main() -> ! {
     let mut arrow = Arrow::new(&YELLOW, TAIL_CNT);
 
     let mut color_set = ColorSet::new(&[RED, YELLOW]);
+
+    let mut left_leg = RunningLights::new(&YELLOW, false, TAIL_CNT);
+    let mut right_leg = RunningLights::new(&YELLOW, true, TAIL_CNT);
 
     let mut animation = Animation::new(LED_CNT);
     loop {
@@ -115,6 +124,8 @@ fn main() -> ! {
         }
 
         // arrow effect
+        left_leg.mutate(&mut strip[LEFT_LEG_LED_RANGE]);
+        right_leg.mutate(&mut strip[RIGHT_LEG_LED_RANGE]);
         arrow.mutate(&mut strip[ARROW_LED_RANGE]);
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
