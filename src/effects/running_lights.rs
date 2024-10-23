@@ -4,18 +4,29 @@ use smart_leds::RGB8;
 // shines bright, dragging a tail of diminishing brightness behind it
 pub struct RunningLights {
     color: RGB8,
+    // If true, the pattern will not repeat until the tail has completely exited; i.e.,
+    // if true, the last frame of the animation will be comprised of all LEDs turned off.
+    // If false, the head will appear to chase the tail.
+    tail_must_exit_before_restart: bool,
     run_in_reverse: bool,
     color_at_terminus: RGB8,
-    head_index: usize,
+    // can potentially be outside the range of LEDs assigned the effect, if tail_must_exit_before_restart == true
+    head_position: usize,
     tail_length: usize,
 }
 
 impl RunningLights {
-    pub fn new(color: &RGB8, run_in_reverse: bool, tail_length: usize) -> Self {
+    pub fn new(
+        color: &RGB8,
+        tail_must_exit_before_restart: bool,
+        run_in_reverse: bool,
+        tail_length: usize,
+    ) -> Self {
         Self {
             color: *color,
             color_at_terminus: RGB8::default(),
-            head_index: 0,
+            tail_must_exit_before_restart,
+            head_position: 0,
             run_in_reverse,
             tail_length,
         }
@@ -26,7 +37,7 @@ impl RunningLights {
     }
 
     pub fn mutate(&mut self, leds: &mut [RGB8]) {
-        if leds.len() <= self.tail_length {
+        if !self.tail_must_exit_before_restart && leds.len() <= self.tail_length {
             panic!("Number of LEDs too short to support configured tail length.");
         }
 
@@ -35,15 +46,25 @@ impl RunningLights {
             *led = RGB8::default();
         }
 
-        leds[self.head_index] = self.color;
+        if let Some(_) = leds.get(self.head_position) {
+            leds[self.head_position] = self.color;
+        }
 
         for index_in_effect in 1..=self.tail_length {
-            let overall_index = match leds.get(self.head_index - index_in_effect) {
-                Some(_) => self.head_index - index_in_effect,
-                None => leds.len() + self.head_index - index_in_effect,
+            let index_in_strip = match leds.get(self.head_position - index_in_effect) {
+                Some(_) => Some(self.head_position - index_in_effect),
+                None => {
+                    if self.tail_must_exit_before_restart == true {
+                        None
+                    } else {
+                        Some(leds.len() + self.head_position - index_in_effect)
+                    }
+                }
             };
 
-            leds[overall_index] = self.dim(index_in_effect, self.tail_length);
+            if let Some(i) = index_in_strip {
+                leds[i] = self.dim(index_in_effect, self.tail_length);
+            }
         }
 
         self.color_at_terminus = leds[leds.len() - 1];
@@ -52,11 +73,19 @@ impl RunningLights {
             leds.reverse();
         }
 
-        // move the head one pixel up the strip
-        if self.head_index < leds.len() - 1 {
-            self.head_index += 1;
+        // the number of frames in the animation; can be longer than the number of LEDs depending on
+        // self.tail_must_exit_before_restart and self.tail_length
+        let frame_cnt = if self.tail_must_exit_before_restart {
+            leds.len() + self.tail_length
         } else {
-            self.head_index = 0;
+            leds.len()
+        };
+
+        // advance the head
+        if self.head_position < frame_cnt - 1 {
+            self.head_position += 1;
+        } else {
+            self.head_position = 0;
         }
     }
 

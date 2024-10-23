@@ -22,8 +22,10 @@ const LEFT_LEG_END: usize = 212;
 const RIGHT_LEG_START: usize = 176;
 const RIGHT_LEG_END: usize = 189;
 const GLITCH_FRAME_CNT: usize = 150;
+const SPLIT_ARROW_FRAME_CNT: usize = 100;
 const LED_CNT: usize = 300;
-const TAIL_CNT: usize = 10; // does not include the head of the running lights
+const TAIL_CNT: usize = 20; // does not include the head of the running lights
+const TAIL_MUST_EXIT_BEFORE_RESTART: bool = true;
 const YELLOW: RGB8 = RGB8 {
     r: 255,
     g: 180,
@@ -63,12 +65,23 @@ fn main() -> ! {
     // define the strip with the LEDs initialized in the "off" setting
     let mut strip = [RGB8::default(); LED_CNT];
 
-    let mut arrow = Arrow::new(&YELLOW, TAIL_CNT);
+    let mut arrow = Arrow::new(&YELLOW, TAIL_CNT, TAIL_MUST_EXIT_BEFORE_RESTART);
 
     let mut color_set = ColorSet::new(&[RED, YELLOW]);
 
-    let mut left_leg = RunningLights::new(&YELLOW, false, TAIL_CNT);
-    let mut right_leg = RunningLights::new(&YELLOW, true, TAIL_CNT);
+    let run_in_reverse = true;
+    let mut left_leg = RunningLights::new(
+        &YELLOW,
+        TAIL_MUST_EXIT_BEFORE_RESTART,
+        !run_in_reverse,
+        TAIL_CNT,
+    );
+    let mut right_leg = RunningLights::new(
+        &YELLOW,
+        TAIL_MUST_EXIT_BEFORE_RESTART,
+        run_in_reverse,
+        TAIL_CNT,
+    );
 
     let mut animation = Animation::new(LED_CNT);
     loop {
@@ -123,10 +136,30 @@ fn main() -> ! {
             }
         }
 
-        // arrow effect
-        left_leg.mutate(&mut strip[LEFT_LEG_LED_RANGE]);
-        right_leg.mutate(&mut strip[RIGHT_LEG_LED_RANGE]);
-        arrow.mutate(&mut strip[ARROW_LED_RANGE]);
+        // split arrow effect -- this repeats after 100 frames (a third as often as the overall animation);
+        // to keep the conditions below a little simpler provide an effect-specific frame counter
+        let split_arrow_frames_displayed =
+            match animation.frames_displayed().cmp(&SPLIT_ARROW_FRAME_CNT) {
+                Ordering::Less => animation.frames_displayed(),
+                Ordering::Equal => 0,
+                Ordering::Greater => animation
+                    .frames_displayed()
+                    .saturating_sub(SPLIT_ARROW_FRAME_CNT),
+            };
+
+        // assumes the legs are the same length -- the number of frames required for the running lights to
+        // completely exit the legs of the arrow
+        if split_arrow_frames_displayed < strip[LEFT_LEG_LED_RANGE].len() + TAIL_CNT {
+            left_leg.mutate(&mut strip[LEFT_LEG_LED_RANGE]);
+            right_leg.mutate(&mut strip[RIGHT_LEG_LED_RANGE]);
+        // the number of frames required for the above leg animation (LEFT_LEG plus TAIL), plus the arrow head
+        // animation (divide number of pixels by two because an arrow is essentially a set of parallel running
+        // lights effects, plus the tail length)
+        } else if split_arrow_frames_displayed
+            < strip[LEFT_LEG_LED_RANGE].len() + strip[ARROW_LED_RANGE].len() / 2 + TAIL_CNT * 2
+        {
+            arrow.mutate(&mut strip[ARROW_LED_RANGE]);
+        }
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
 

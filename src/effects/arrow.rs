@@ -7,11 +7,11 @@ pub struct Arrow {
 }
 
 impl Arrow {
-    pub fn new(color: &RGB8, tail_length: usize) -> Self {
+    pub fn new(color: &RGB8, tail_length: usize, tail_must_exit_before_restart: bool) -> Self {
         let run_in_reverse = true;
         Self {
-            left: RunningLights::new(color, !run_in_reverse, tail_length),
-            right: RunningLights::new(color, run_in_reverse, tail_length),
+            left: RunningLights::new(color, tail_must_exit_before_restart, !run_in_reverse, tail_length),
+            right: RunningLights::new(color, tail_must_exit_before_restart, run_in_reverse, tail_length),
         }
     }
 
