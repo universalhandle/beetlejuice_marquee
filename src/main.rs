@@ -152,6 +152,8 @@ fn main() -> ! {
         if split_arrow_frames_displayed < strip[LEFT_LEG_LED_RANGE].len() + TAIL_CNT {
             left_leg.mutate(&mut strip[LEFT_LEG_LED_RANGE]);
             right_leg.mutate(&mut strip[RIGHT_LEG_LED_RANGE]);
+            // quick and dirty fix for the glitch effect range being less than perfectly accurate
+            strip[ARROW_LED_RANGE].fill(RGB8::default());
         // the number of frames required for the above leg animation (LEFT_LEG plus TAIL), plus the arrow head
         // animation (divide number of pixels by two because an arrow is essentially a set of parallel running
         // lights effects, plus the tail length)
@@ -159,6 +161,14 @@ fn main() -> ! {
             < strip[LEFT_LEG_LED_RANGE].len() + strip[ARROW_LED_RANGE].len() / 2 + TAIL_CNT * 2
         {
             arrow.mutate(&mut strip[ARROW_LED_RANGE]);
+            // quick and dirty fix for the glitch effect range being less than perfectly accurate
+            strip[LEFT_LEG_LED_RANGE].fill(RGB8::default());
+            strip[RIGHT_LEG_LED_RANGE].fill(RGB8::default());
+        // quick and dirty fix for the glitch effect range being less than perfectly accurate
+        } else {
+            strip[LEFT_LEG_LED_RANGE].fill(RGB8::default());
+            strip[RIGHT_LEG_LED_RANGE].fill(RGB8::default());
+            strip[ARROW_LED_RANGE].fill(RGB8::default());
         }
 
         ws.write(gamma(strip.iter().cloned())).unwrap();
