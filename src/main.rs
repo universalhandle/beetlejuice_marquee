@@ -1,31 +1,23 @@
 #![no_std]
 #![no_main]
 
-mod animation;
-mod effects;
-
-use animation::Animation;
-use arduino_hal::spi;
-use core::cmp::Ordering;
-use core::ops::{RangeFrom, RangeInclusive, RangeTo};
-use effects::{arrow::Arrow, color_set::ColorSet, running_lights::RunningLights};
+use arduino_hal::{spi, Spi};
 use panic_halt as _;
-use rand::{rngs::SmallRng, Rng, SeedableRng};
-use smart_leds::{gamma, SmartLedsWrite, RGB8};
+use smart_leds_animations::{
+    animations::{Arrow, Snake},
+    composition::{Compose, Parallel, Series},
+    harness::*,
+    smart_leds::RGB8,
+};
 use ws2812_spi::Ws2812;
 
-// global configurations
-const ARROW_START: usize = 44;
-const ARROW_END: usize = 91;
-const LEFT_LEG_START: usize = 199;
-const LEFT_LEG_END: usize = 212;
-const RIGHT_LEG_START: usize = 176;
-const RIGHT_LEG_END: usize = 189;
-const GLITCH_FRAME_CNT: usize = 150;
-const SPLIT_ARROW_FRAME_CNT: usize = 100;
-const LED_CNT: usize = 300;
-const TAIL_CNT: usize = 20; // does not include the head of the running lights
-const TAIL_MUST_EXIT_BEFORE_RESTART: bool = true;
+mod animations;
+use animations::Glitch;
+
+/// The length of the tail for each Snake animation (does not include the head)
+const TAIL_CNT: usize = 20;
+const CHASE_TAIL: bool = false;
+const WRAP_ARROW: bool = false;
 const YELLOW: RGB8 = RGB8 {
     r: 255,
     g: 180,
@@ -37,152 +29,78 @@ const RED: RGB8 = RGB8 {
     b: 65,
 };
 
-// somewhat derived configs...
-const ARROW_LED_RANGE: RangeInclusive<usize> = ARROW_START..=ARROW_END;
-const GLITCH_LED_RANGE_1: RangeTo<usize> = ..ARROW_START;
-const GLITCH_LED_RANGE_2: RangeFrom<usize> = (ARROW_END + 1)..;
-const LEFT_LEG_LED_RANGE: RangeInclusive<usize> = LEFT_LEG_START..=LEFT_LEG_END;
-const RIGHT_LEG_LED_RANGE: RangeInclusive<usize> = RIGHT_LEG_START..=RIGHT_LEG_END;
-// end config
-
 #[arduino_hal::entry]
 fn main() -> ! {
-    let dp = arduino_hal::Peripherals::take().unwrap();
-    let pins = arduino_hal::pins!(dp);
+    let writer = set_up_writer();
 
+    // Hardware setup, which is really the domain of the `arduino_hal` and `smart_leds` crates, is tucked away into the
+    // `set_up_writer()` function, invoked above, so that `main()` may highlight the role of the `smart_leds_animations`
+    // crate in creating the display pictured at https://github.com/universalhandle/smart_leds_animations/raw/main/example.gif.
+    // In this project, a single, unbroken LED strip borders the marquee (a rectangle with an arrow going through it). In
+    // many cases the visual effects are realized across noncontiguous pixels.
+
+    let driver = DriverBuilder::new(writer)
+        .enable_gamma_correction(true)
+        .build();
+
+    let mut director = DirectorBuilder::new(driver).build();
+
+    // Define the strip with the LEDs initialized in the "off" setting.
+    let mut pixels = [RGB8::default(); 300];
+
+    // The pixels bordering the rectangle should use our custom `Glitch` animation. Since the pixels in question
+    // are not contiguous on the LED strip, three separate `Glitch` animations are needed.
+    let colors = [RED, YELLOW];
+    let mut glitch1 = Glitch::new(&colors, 0..=43);
+    let mut glitch2 = Glitch::new(&colors, 92..=175);
+    let mut glitch3 = Glitch::new(&colors, 213..=299);
+
+    // The next major component of the animation is an arrow broken by the rectangular section of the marquee.
+    // First, we declare a pair of `Snake` animations to act as the fletching of the arrow.
+    let run_in_reverse = true;
+    let mut left_leg = Snake::new(YELLOW, CHASE_TAIL, 199..=212, !run_in_reverse, TAIL_CNT);
+    let mut right_leg = Snake::new(YELLOW, CHASE_TAIL, 176..=189, run_in_reverse, TAIL_CNT);
+    // These are grouped together in a `Parallel` animation because they need to be treated as a single unit in the
+    // `Series` animation that represents the broken arrow as a whole.
+    let mut fletching_parts: [&mut dyn Compose<RGB8>; 2] = [&mut left_leg, &mut right_leg];
+    let mut fletching = Parallel::new(&mut fletching_parts);
+
+    // Next, we declare an `Arrow` animation for the pointy part of the broken arrow.
+    let mut arrow = Arrow::new(YELLOW, 44..=91, TAIL_CNT, WRAP_ARROW);
+
+    // Now we compose the fletching and arrow into a single `Series` animation.
+    let mut broken_arrow_parts: [(&mut dyn Compose<RGB8>, usize); 2] = [
+        // The lights appear to run up the fletching and disappear behind the rectangle. Then, after the specified delay (in animation frames)…
+        (&mut fletching, 0),
+        // …the lights reappear and continue toward the point of the arrow. After the specifiied delay the compound animation restarts.
+        (&mut arrow, 0),
+    ];
+    let mut broken_arrow = Series::new(&mut broken_arrow_parts);
+
+    // The show starts the Director calls action. We just have to hand it the pixels and the animations we configured.
+    director.action(
+        &mut pixels,
+        &mut [&mut glitch1, &mut glitch2, &mut broken_arrow, &mut glitch3],
+    );
+}
+
+/// Configures the LED writer for this particular hardware.
+///
+/// In this case, I'm using a WS2812B LED strip with an Arduino Uno R3. This code is fairly boilerplate; I adapted it
+/// from [the avr-hal-template](https://github.com/Rahix/avr-hal-template) and [one of the `smart_leds` examples](
+/// https://github.com/smart-leds-rs/smart-leds-samples/blob/5bea1bb763fd4b068548c00197e211b31af41d18/avr-examples/examples/avr_ws2812_blink_spi_pre.rs).
+fn set_up_writer() -> Ws2812<Spi> {
+    let peripherals = arduino_hal::Peripherals::take().unwrap();
+    let pins = arduino_hal::pins!(peripherals);
+
+    // spi: serial peripheral interface
     let (spi, _) = spi::Spi::new(
-        dp.SPI,
+        peripherals.SPI,
         pins.d13.into_output(),
         pins.d11.into_output(),
         pins.d12.into_pull_up_input(),
         pins.d10.into_output(),
         spi::Settings::default(),
     );
-    let mut ws = Ws2812::new(spi);
-
-    let mut rng = SmallRng::seed_from_u64(361279846193);
-
-    // define the strip with the LEDs initialized in the "off" setting
-    let mut strip = [RGB8::default(); LED_CNT];
-
-    let mut arrow = Arrow::new(&YELLOW, TAIL_CNT, TAIL_MUST_EXIT_BEFORE_RESTART);
-
-    let mut color_set = ColorSet::new(&[RED, YELLOW]);
-
-    let run_in_reverse = true;
-    let mut left_leg = RunningLights::new(
-        &YELLOW,
-        TAIL_MUST_EXIT_BEFORE_RESTART,
-        !run_in_reverse,
-        TAIL_CNT,
-    );
-    let mut right_leg = RunningLights::new(
-        &YELLOW,
-        TAIL_MUST_EXIT_BEFORE_RESTART,
-        run_in_reverse,
-        TAIL_CNT,
-    );
-
-    let mut animation = Animation::new(LED_CNT);
-    loop {
-        // Assign colors from our palette to the LEDs in a seemingly random but idempotent way.
-        // This has to happen inside the loop (and hence can't be actually randomly assigned)
-        // because the Arduino doesn't have the memory capacity for the originally assigned
-        // plus the currently assigned (e.g., turned off) color for every LED. The non-randomness
-        // assures that, even though some LEDs will be turned off in some cycles, each LED will
-        // have its original color assigned the next time through, as opposed to being lit red
-        // one cycle, dark the next, and yellow after that.
-        color_set.mutate(&mut strip);
-
-        // glitchy flash effect -- this repeats after 150 frames (half as often as the overall animation);
-        // to keep the conditions below a little simpler provide an effect-specific frame counter
-        let glitch_frames_displayed = match animation.frames_displayed().cmp(&GLITCH_FRAME_CNT) {
-            Ordering::Less => animation.frames_displayed(),
-            Ordering::Equal => 0,
-            Ordering::Greater => animation
-                .frames_displayed()
-                .saturating_sub(GLITCH_FRAME_CNT),
-        };
-
-        if glitch_frames_displayed < 20
-            || (30 < glitch_frames_displayed && glitch_frames_displayed <= 45)
-        {
-            // leave the lights on
-        } else if 75 <= glitch_frames_displayed && glitch_frames_displayed < 125 {
-            // get glitchy
-            for led in strip[GLITCH_LED_RANGE_1].iter_mut().step_by(2) {
-                let random = rng.gen_range(1..=10);
-                if random > 9 {
-                    *led = RGB8::default();
-                } else if random > 4 {
-                    *led = dim(led, 2);
-                }
-            }
-            for led in strip[GLITCH_LED_RANGE_2].iter_mut().step_by(2) {
-                let random = rng.gen_range(1..=10);
-                if random > 9 {
-                    *led = RGB8::default();
-                } else if random > 4 {
-                    *led = dim(led, 2);
-                }
-            }
-        } else {
-            // turn off every other light
-            for led in strip[GLITCH_LED_RANGE_1].iter_mut().step_by(2) {
-                *led = RGB8::default();
-            }
-            for led in strip[GLITCH_LED_RANGE_2].iter_mut().step_by(2) {
-                *led = RGB8::default();
-            }
-        }
-
-        // split arrow effect -- this repeats after 100 frames (a third as often as the overall animation);
-        // to keep the conditions below a little simpler provide an effect-specific frame counter
-        let split_arrow_frames_displayed =
-            match animation.frames_displayed().cmp(&SPLIT_ARROW_FRAME_CNT) {
-                Ordering::Less => animation.frames_displayed(),
-                Ordering::Equal => 0,
-                Ordering::Greater => animation
-                    .frames_displayed()
-                    .saturating_sub(SPLIT_ARROW_FRAME_CNT),
-            };
-
-        // assumes the legs are the same length -- the number of frames required for the running lights to
-        // completely exit the legs of the arrow
-        if split_arrow_frames_displayed < strip[LEFT_LEG_LED_RANGE].len() + TAIL_CNT {
-            left_leg.mutate(&mut strip[LEFT_LEG_LED_RANGE]);
-            right_leg.mutate(&mut strip[RIGHT_LEG_LED_RANGE]);
-            // quick and dirty fix for the glitch effect range being less than perfectly accurate
-            strip[ARROW_LED_RANGE].fill(RGB8::default());
-        // the number of frames required for the above leg animation (LEFT_LEG plus TAIL), plus the arrow head
-        // animation (divide number of pixels by two because an arrow is essentially a set of parallel running
-        // lights effects, plus the tail length)
-        } else if split_arrow_frames_displayed
-            < strip[LEFT_LEG_LED_RANGE].len() + strip[ARROW_LED_RANGE].len() / 2 + TAIL_CNT * 2
-        {
-            arrow.mutate(&mut strip[ARROW_LED_RANGE]);
-            // quick and dirty fix for the glitch effect range being less than perfectly accurate
-            strip[LEFT_LEG_LED_RANGE].fill(RGB8::default());
-            strip[RIGHT_LEG_LED_RANGE].fill(RGB8::default());
-        // quick and dirty fix for the glitch effect range being less than perfectly accurate
-        } else {
-            strip[LEFT_LEG_LED_RANGE].fill(RGB8::default());
-            strip[RIGHT_LEG_LED_RANGE].fill(RGB8::default());
-            strip[ARROW_LED_RANGE].fill(RGB8::default());
-        }
-
-        ws.write(gamma(strip.iter().cloned())).unwrap();
-
-        animation.next();
-    }
-}
-
-fn dim(led: &RGB8, factor: usize) -> RGB8 {
-    let factor = u8::try_from(factor).and_then(|n| Ok(n)).unwrap();
-
-    RGB8 {
-        r: (led.r / factor),
-        g: (led.g / factor),
-        b: (led.b / factor),
-    }
+    Ws2812::new(spi)
 }

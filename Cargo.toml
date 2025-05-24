@@ -1,12 +1,12 @@
 [package]
-name = "beetlejuice"
+name = "beetlejuice_marquee"
 version = "0.1.0"
-authors = ["Frank J. Gómez <frank@pawpawworks.com>"]
+authors = ["Francisco José Gómez <francisco@pawpawworks.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [[bin]]
-name = "beetlejuice"
+name = "beetlejuice_marquee"
 test = false
 bench = false
 
@@ -16,7 +16,7 @@ ufmt = "0.2.0"
 nb = "1.1.0"
 embedded-hal = "1.0"
 ws2812-spi = "0.5.0"
-smart-leds = "0.4.0"
+smart_leds_animations = "0.1.0"
 
 [dependencies.arduino-hal]
 git = "https://github.com/rahix/avr-hal"

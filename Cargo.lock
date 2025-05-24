@@ -26,6 +26,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "autocfg"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
+
+[[package]]
 name = "avr-device"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -73,7 +79,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fe8f5a8a398345e52358e18ff07cc17a568fbca5c6f73873d3a62056309603"
 
 [[package]]
-name = "beetlejuice"
+name = "beetlejuice_marquee"
 version = "0.1.0"
 dependencies = [
  "arduino-hal",
@@ -82,7 +88,7 @@ dependencies = [
  "panic-halt",
  "proc-macro2",
  "rand",
- "smart-leds",
+ "smart_leds_animations",
  "ufmt",
  "ws2812-spi",
 ]
@@ -157,6 +163,15 @@ name = "nb"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d"
+
+[[package]]
+name = "num-traits"
+version = "0.2.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "panic-halt"
@@ -234,6 +249,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bc64ee02bbbf469603016df746c0ed224f263280b6ebb49b7ebadbff375c572"
 dependencies = [
  "rgb",
+]
+
+[[package]]
+name = "smart_leds_animations"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "175013a658cd5568ecb4a4bf7f8ebdad80cce5857ab0e8a37a47226ef31add0b"
+dependencies = [
+ "num-traits",
+ "rgb",
+ "smart-leds",
 ]
 
 [[package]]
